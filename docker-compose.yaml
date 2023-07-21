@@ -1,0 +1,74 @@
+version: '3'
+services:
+  redis:
+    container_name: redis
+    image: redis
+    ports:
+      - '6380:6379'
+    networks:
+      - webnet
+  db:
+    container_name: db
+    image: postgres
+    volumes:
+      - ./data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - '5440:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    networks:
+      - webnet
+  backend:
+    container_name: backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app/project/backend
+    ports:
+      - '8000:8000'
+    restart: on-failure
+    environment:
+      APP_PORT: 8000
+      JWT_ACCESS_SECRET: secret_access
+      JWT_ACCESS_EXPITES_IN_MINUTES: 15
+      JWT_REFRESH_SECRET: secret_refresh
+      JWT_REFRESH_EXPITES_IN_DAYS: 3
+      DB_URL: postgresql://fit_sync:nikita@db:5432/fit_sync
+      REDIS_URL: redis://redis:6379
+      COOKIE_SECRET: secret
+      NODE_ENV: development      
+      YANDEX_USER_KEY: YCAJEjRdGQlXLp48QqcLZFKUs
+      YANDEX_USER_SECRET_KEY: YCNb4Fo__qnKuPQAYOiiiwK_UFO8wcDtuSwgwl1G
+      YANDEX_REGION: ru-central1
+      BUCKET_NAME: fit-sync
+    command: bash -c 'npm run db && npm run dev'
+    networks:
+      - webnet
+    depends_on:
+      - db
+      - redis
+  frontend:
+    container_name: frontend
+    build:
+      context: './frontend'
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app/project/frontend
+    ports:
+      - '3000:3000'
+    environment:
+      REACT_APP_SERVER_URL: http://localhost:8000
+    command: bash -c 'npm run start'
+    networks:
+      - webnet
+    depends_on:
+      - backend
+networks:
+  webnet:
+    driver: bridge
+
+
